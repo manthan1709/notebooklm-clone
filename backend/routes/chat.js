@@ -6,42 +6,91 @@ from "../services/retriever.js";
 import { askGroq }
 from "../services/groq.js";
 
-const router = express.Router();
+import {
+  validateRetrieval
+}
+from "../services/retrievalValidator.js";
 
-router.post("/", async (req, res) => {
+import {
+  rewriteQuery
+}
+from "../services/queryRewriter.js";
 
-  try {
+const router =
+  express.Router();
 
-    const { question } = req.body;
+router.post(
+  "/",
+  async (req, res) => {
 
-    const docs =
-      await retrieveDocs(question);
+    try {
 
-    const context =
-      docs.map(doc => doc.pageContent)
-          .join("\n\n");
-
-    const answer =
-      await askGroq(
-        context,
+      const {
         question
+      } = req.body;
+
+      let docs =
+        await retrieveDocs(
+          question
+        );
+
+      console.log(
+        "Retrieval Validation Running..."
       );
 
-    res.json({
-      answer,
-      sources: docs.length,
-    });
+      const valid =
+        await validateRetrieval(
+          question,
+          docs
+        );
 
-  } catch (error) {
+      if (!valid) {
 
-    console.error(error);
+        console.log(
+          "Retrieval weak. Retrying..."
+        );
 
-    res.status(500).json({
-      error: error.message,
-    });
+        const improvedQuery =
+          await rewriteQuery(
+            question
+          );
 
+        console.log(
+          "Rewritten Query:",
+          improvedQuery
+        );
+
+        docs =
+          await retrieveDocs(
+            improvedQuery
+          );
+      }
+
+      const answer =
+        await askGroq(
+          docs,
+          question
+        );
+
+      res.json({
+        answer,
+        retrievedChunks:
+          docs.length,
+      });
+
+    } catch (error) {
+
+      console.error(
+        error
+      );
+
+      res.status(500)
+        .json({
+          error:
+            error.message
+        });
+    }
   }
-
-});
+);
 
 export default router;

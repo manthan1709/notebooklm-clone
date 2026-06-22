@@ -15,11 +15,44 @@ export async function retrieveDocs(question) {
       }
     );
 
-  const docs =
-    await vectorStore.similaritySearch(
-      question,
-      5
-    );
+  const queries = [
+    question,
+    `Explain ${question}`,
+    `Detailed information about ${question}`,
+    `Give examples of ${question}`,
+  ];
 
-  return docs;
+  console.log("Multi Query Retrieval Running...");
+  console.log(queries);
+
+  let allDocs = [];
+
+  for (const q of queries) {
+
+    const docs =
+      await vectorStore.similaritySearch(
+        q,
+        3
+      );
+
+    allDocs.push(...docs);
+  }
+
+  const uniqueDocs = [];
+
+  const seen = new Set();
+
+  for (const doc of allDocs) {
+
+    if (
+      !seen.has(doc.pageContent)
+    ) {
+
+      seen.add(doc.pageContent);
+
+      uniqueDocs.push(doc);
+    }
+  }
+
+  return uniqueDocs.slice(0, 10);
 }
